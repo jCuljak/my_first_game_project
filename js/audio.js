@@ -14,8 +14,13 @@ const GameAudio = (() => {
   let nextStepTime = 0;
   let step = 0;
 
-  const BPM = 128;
-  const STEP = 60 / BPM / 4; // one sixteenth note
+  const BASE_BPM = 128;
+  let bpm = BASE_BPM;
+  let level = 0;
+  let slowed = false;
+  // Slow-mo drags the loop down with it, which sells the effect harder than
+  // any visual tint does.
+  const stepDuration = () => 60 / (slowed ? bpm * 0.7 : bpm) / 4;
   const LOOKAHEAD = 0.12; // seconds of audio scheduled ahead of the clock
   const TICK = 25; // ms between scheduler wake-ups
 
@@ -23,6 +28,7 @@ const GameAudio = (() => {
   // syncopated kick pushing against an offbeat hat.
   const KICK = [0, 4, 7, 8, 12, 16, 20, 23, 24, 28];
   const CLAP = [4, 12, 20, 28];
+  const EXTRA_KICK = [2, 10, 18, 26];
 
   const A1 = 55.0;
   const G1 = 48.99;
@@ -172,6 +178,12 @@ const GameAudio = (() => {
     if (KICK.includes(i)) kick(t);
     if (CLAP.includes(i)) clap(t);
     if (i % 2 === 1) hat(t);
+
+    // Extra layers stack with the level so later minutes read as denser, not
+    // merely faster. Tempo alone stops being noticeable after a few steps.
+    if (level >= 3 && i % 2 === 0) hat(t);
+    if (level >= 6 && EXTRA_KICK.includes(i)) kick(t);
+
     if (BASS[i]) bass(t, BASS[i]);
     if (LEAD[i]) lead(t, LEAD[i]);
   }
@@ -179,7 +191,7 @@ const GameAudio = (() => {
   function scheduler() {
     while (nextStepTime < ctx.currentTime + LOOKAHEAD) {
       scheduleStep(step, nextStepTime);
-      nextStepTime += STEP;
+      nextStepTime += stepDuration();
       step = (step + 1) % 32;
     }
   }
@@ -275,5 +287,139 @@ const GameAudio = (() => {
     return muted;
   }
 
-  return { init, startMusic, stopMusic, warn, zap, gameOver, toggleMute, isMuted };
+
+  // Each difficulty step raises the tempo. 4 BPM a step reaches 176 at the
+  // final level: clearly faster, still danceable rather than a buzz. The
+  // layers added in scheduleStep carry the rest of the intensity.
+  function setLevel(next) {
+    level = Math.min(Math.max(next, 0), 12);
+    bpm = BASE_BPM + level * 4;
+  }
+
+  // Three rising notes, so a level-up is audible even with the flash missed.
+  function levelUp() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    [523.25, 659.25, 880.0].forEach((freq, i) => {
+      const at = t + i * 0.075;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.value = freq;
+      env(g.gain, at, 0.2, 0.006, 0.13);
+      o.connect(g);
+      g.connect(sfxGain);
+      o.start(at);
+      o.stop(at + 0.16);
+    });
+  }
+
+  function burst() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const n = noise();
+    const f = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(2600, t);
+    f.frequency.exponentialRampToValueAtTime(320, t + 0.3);
+    env(g.gain, t, 0.32, 0.005, 0.34);
+    n.connect(f);
+    f.connect(g);
+    g.connect(sfxGain);
+    n.start(t);
+    n.stop(t + 0.36);
+
+    const o = ctx.createOscillator();
+    const og = ctx.createGain();
+    o.type = "triangle";
+    o.frequency.setValueAtTime(180, t);
+    o.frequency.exponentialRampToValueAtTime(50, t + 0.25);
+    env(og.gain, t, 0.28, 0.005, 0.28);
+    o.connect(og);
+    og.connect(sfxGain);
+    o.start(t);
+    o.stop(t + 0.3);
+  }
+
+  function dash() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const n = noise();
+    const f = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    f.type = "bandpass";
+    f.frequency.setValueAtTime(500, t);
+    f.frequency.exponentialRampToValueAtTime(4200, t + 0.16);
+    f.Q.value = 2;
+    env(g.gain, t, 0.22, 0.006, 0.2);
+    n.connect(f);
+    f.connect(g);
+    g.connect(sfxGain);
+    n.start(t);
+    n.stop(t + 0.22);
+  }
+
+  function setSlow(on) {
+    slowed = on;
+  }
+
+  // Health rises through a major triad; slow-mo falls, which is the whole
+  // point of it. Two cues you can tell apart without looking.
+  function pickup(kind) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const notes = kind === "health" ? [523.25, 783.99, 1046.5] : [880.0, 587.33, 440.0];
+
+    notes.forEach((freq, i) => {
+      const at = t + i * 0.06;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = kind === "health" ? "triangle" : "sine";
+      o.frequency.value = freq;
+      env(g.gain, at, 0.24, 0.005, 0.16);
+      o.connect(g);
+      g.connect(sfxGain);
+      o.start(at);
+      o.stop(at + 0.2);
+    });
+  }
+
+  // Losing a life, as distinct from losing the run: shorter, less final.
+  function hurt() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const o = ctx.createOscillator();
+    const f = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    o.type = "square";
+    o.frequency.setValueAtTime(220, t);
+    o.frequency.exponentialRampToValueAtTime(70, t + 0.28);
+    f.type = "lowpass";
+    f.frequency.value = 1400;
+    env(g.gain, t, 0.3, 0.005, 0.3);
+    o.connect(f);
+    f.connect(g);
+    g.connect(sfxGain);
+    o.start(t);
+    o.stop(t + 0.32);
+
+    const n = noise();
+    const ng = ctx.createGain();
+    env(ng.gain, t, 0.2, 0.004, 0.14);
+    n.connect(ng);
+    ng.connect(sfxGain);
+    n.start(t);
+    n.stop(t + 0.16);
+  }
+
+  return {
+    init, startMusic, stopMusic, setLevel, levelUp, setSlow,
+    warn, zap, burst, dash, pickup, hurt, gameOver,
+    toggleMute, isMuted,
+  };
 })();

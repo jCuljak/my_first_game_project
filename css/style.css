@@ -31,8 +31,9 @@ body {
 
 #hint {
   margin: 0;
-  font-family: "Courier New", monospace;
-  font-size: 13px;
+  font-family: "Press Start 2P", "Courier New", monospace;
+  font-size: 9px;
+  line-height: 1.9;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #6b7385;

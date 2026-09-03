@@ -4,12 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My First Game</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <main id="game-shell">
     <canvas id="game" width="800" height="600"></canvas>
-    <p id="hint">Arrow keys or WASD to dodge &middot; R to restart &middot; M to mute</p>
+    <p id="hint">
+      Move WASD / Arrows &middot; Shift Dash &middot; Esc Pause &middot; R Restart &middot; M Mute
+    </p>
   </main>
 
   <!-- audio.js first: game.js reads GameAudio on its very first frame. -->
