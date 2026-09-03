@@ -25,3 +25,13 @@ assets/         images and sounds
 ## Controls
 
 Arrow keys or WASD to move.
+
+## Repository
+
+https://github.com/jCuljak/my_first_game_project
+
+To clone it somewhere else:
+
+```bash
+git clone https://github.com/jCuljak/my_first_game_project.git
+```
