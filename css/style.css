@@ -8,7 +8,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #12141c;
+  background: radial-gradient(circle at 50% 30%, #171d3d 0%, #080a14 70%);
   color: #c9cfdb;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -17,20 +17,23 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 #game {
-  background: #1b1f2b;
-  border: 1px solid #2c3244;
+  background: #0a0e1f;
+  border: 1px solid #38406b;
   border-radius: 6px;
   max-width: 100%;
-  /* Keeps pixel art crisp instead of blurry when the canvas is scaled. */
-  image-rendering: pixelated;
+  /* Faint glow so the canvas reads as a lit arcade screen. */
+  box-shadow: 0 0 34px rgba(80, 120, 255, 0.28);
 }
 
 #hint {
   margin: 0;
-  font-size: 14px;
+  font-family: "Courier New", monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: #6b7385;
 }
