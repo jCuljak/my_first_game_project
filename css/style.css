@@ -2,12 +2,19 @@
   box-sizing: border-box;
 }
 
+html, body {
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 14px;
+  padding: 14px;
   background: radial-gradient(circle at 50% 30%, #171d3d 0%, #080a14 70%);
   color: #c9cfdb;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -18,18 +25,33 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 14px;
+  width: 100%;
+}
+
+/* Bounded by width (800px), and on short/landscape screens by height too —
+   calc(66vh * 4 / 3) is the widest the canvas can be before a 4:3 box would
+   exceed 66% of the viewport's height. */
+#canvas-wrap {
+  position: relative;
+  width: min(100%, 800px, calc(66vh * 4 / 3));
 }
 
 #game {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   background: #0a0e1f;
   border: 1px solid #38406b;
   border-radius: 6px;
-  max-width: 100%;
   /* Faint glow so the canvas reads as a lit arcade screen. */
   box-shadow: 0 0 34px rgba(80, 120, 255, 0.28);
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
-#hint {
+#hint,
+#hint-touch {
   margin: 0;
   font-family: "Press Start 2P", "Courier New", monospace;
   font-size: 9px;
@@ -37,4 +59,106 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #6b7385;
+  text-align: center;
+}
+
+#hint-touch {
+  display: none;
+}
+
+#pause-btn {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid #4a5480;
+  background: rgba(10, 14, 31, 0.72);
+  color: #9fb3d9;
+  font-family: "Press Start 2P", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1;
+  touch-action: none;
+}
+
+#pause-btn:active {
+  background: rgba(66, 232, 255, 0.22);
+  color: #d6fbff;
+}
+
+#touch-controls {
+  display: none;
+  width: min(100%, 800px, calc(66vh * 4 / 3));
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Touch-primary devices only. A mouse-and-keyboard laptop never sees any of
+   this — the canvas keeps its exact previous desktop sizing and behaviour. */
+@media (hover: none) and (pointer: coarse) {
+  #hint {
+    display: none;
+  }
+  #hint-touch {
+    display: block;
+  }
+  #pause-btn {
+    display: block;
+  }
+  #touch-controls {
+    display: flex;
+  }
+}
+
+#joystick {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(122, 248, 255, 0.35);
+  touch-action: none;
+}
+
+#joystick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: rgba(122, 248, 255, 0.28);
+  border: 1px solid #7af8ff;
+  box-shadow: 0 0 12px rgba(66, 232, 255, 0.5);
+  /* JS drives position via this transform; no transition, so it tracks the
+     finger with zero lag. */
+  will-change: transform;
+}
+
+#dash-btn {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 1px solid #7af8ff;
+  background: rgba(58, 167, 255, 0.16);
+  color: #d6fbff;
+  font-family: "Press Start 2P", "Courier New", monospace;
+  font-size: 10px;
+  box-shadow: 0 0 14px rgba(66, 232, 255, 0.35);
+  touch-action: none;
+}
+
+#dash-btn:active {
+  background: rgba(122, 248, 255, 0.4);
+}
+
+#dash-btn.cooling {
+  opacity: 0.35;
+  pointer-events: none;
+  box-shadow: none;
 }

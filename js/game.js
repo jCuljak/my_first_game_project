@@ -6,6 +6,11 @@ const H = canvas.height;
 
 const FONT = '"Press Start 2P", "Courier New", monospace';
 
+// Same test as the CSS "@media (hover: none) and (pointer: coarse)" rule
+// that shows the on-screen controls, so canvas-drawn copy matches whichever
+// set of controls is actually on screen.
+const TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
 // ---------------------------------------------------------------- tuning
 
 const PLAYER_SIZE = 30;
@@ -42,11 +47,13 @@ const OBJ_SIZE_RANGE = 14; // 10-24 across
 const MAX_ANGLE = Math.PI / 3.2;
 
 const SEEKER_DELAY = 15; // seconds before seekers start appearing
-const SEEKER_CHANCE_MIN = 0.1;
-const SEEKER_CHANCE_MAX = 0.26;
-const SEEKER_ACCEL = 210;
-const SEEKER_MAX = 320;
-const SEEKER_TRACK = 4.5; // it only chases for this long, then flies straight
+// Rarer, but the ones that do spawn commit harder: more accel, higher top
+// speed, and a longer chase window before they give up and fly straight.
+const SEEKER_CHANCE_MIN = 0.05;
+const SEEKER_CHANCE_MAX = 0.14;
+const SEEKER_ACCEL = 320;
+const SEEKER_MAX = 350;
+const SEEKER_TRACK = 6;
 const SEEKER_COLOR = "#ff2fb0";
 
 const VOLATILE_MIN = 0.18;
@@ -124,7 +131,14 @@ const keys = new Set();
 let audioReady = false;
 let started = false;
 
+// Set by the on-screen joystick while a finger is down on it. Non-zero here
+// always wins over the keyboard, so touch and keyboard never fight over
+// which one is "the" input for a frame.
+let touchVector = { x: 0, y: 0 };
+
 function inputDir() {
+  if (touchVector.x || touchVector.y) return touchVector;
+
   let x = 0;
   let y = 0;
   if (keys.has("arrowleft") || keys.has("a")) x -= 1;
@@ -141,23 +155,29 @@ function inputDir() {
   return { x, y };
 }
 
+// Browsers block audio until a gesture, which is exactly what the title
+// screen is for: whatever input starts the run also unlocks the sound.
+// Shared by keyboard and every touch control below. Returns true the one
+// time it actually performs the start transition.
+function handleFirstInput() {
+  if (!audioReady) {
+    audioReady = true;
+    GameAudio.init();
+  }
+  if (!started) {
+    started = true;
+    GameAudio.startMusic();
+    return true;
+  }
+  return false;
+}
+
 window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   keys.add(k);
   if (e.key.startsWith("Arrow") || k === " ") e.preventDefault();
 
-  // Browsers block audio until a gesture, which is exactly what the title
-  // screen is for: the key that starts the run also unlocks the sound.
-  if (!audioReady) {
-    audioReady = true;
-    GameAudio.init();
-  }
-
-  if (!started) {
-    started = true;
-    GameAudio.startMusic();
-    return;
-  }
+  if (handleFirstInput()) return;
 
   if (k === "m") GameAudio.toggleMute();
   if (k === "r" && state.gameOver) reset();
@@ -167,6 +187,81 @@ window.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+
+// ---------------------------------------------------------------- touch
+
+// Hidden by CSS on mouse-and-keyboard devices, so these listeners simply
+// never fire there — nothing here touches desktop behaviour.
+const joystickEl = document.getElementById("joystick");
+const knobEl = document.getElementById("joystick-knob");
+const dashBtn = document.getElementById("dash-btn");
+const pauseBtn = document.getElementById("pause-btn");
+
+const JOY_RADIUS = 40; // px the knob can travel from centre; matches the CSS base size
+const JOY_DEADZONE = 0.15; // fraction of JOY_RADIUS treated as centred
+
+let joystickPointerId = null;
+
+function joystickVectorFrom(clientX, clientY) {
+  const rect = joystickEl.getBoundingClientRect();
+  let dx = clientX - (rect.left + rect.width / 2);
+  let dy = clientY - (rect.top + rect.height / 2);
+
+  const dist = Math.hypot(dx, dy);
+  if (dist > JOY_RADIUS) {
+    dx = (dx / dist) * JOY_RADIUS;
+    dy = (dy / dist) * JOY_RADIUS;
+  }
+  knobEl.style.transform = "translate(" + dx + "px, " + dy + "px)";
+
+  const nx = dx / JOY_RADIUS;
+  const ny = dy / JOY_RADIUS;
+  return Math.hypot(nx, ny) < JOY_DEADZONE ? { x: 0, y: 0 } : { x: nx, y: ny };
+}
+
+function resetJoystick() {
+  joystickPointerId = null;
+  touchVector = { x: 0, y: 0 };
+  knobEl.style.transform = "translate(0, 0)";
+}
+
+joystickEl.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  handleFirstInput();
+  joystickPointerId = e.pointerId;
+  joystickEl.setPointerCapture(e.pointerId);
+  touchVector = joystickVectorFrom(e.clientX, e.clientY);
+});
+
+joystickEl.addEventListener("pointermove", (e) => {
+  if (e.pointerId !== joystickPointerId) return;
+  touchVector = joystickVectorFrom(e.clientX, e.clientY);
+});
+
+const endJoystick = (e) => {
+  if (e.pointerId !== joystickPointerId) return;
+  resetJoystick();
+};
+joystickEl.addEventListener("pointerup", endJoystick);
+joystickEl.addEventListener("pointercancel", endJoystick);
+
+dashBtn.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  handleFirstInput();
+  if (!state.paused && !state.gameOver) tryDash();
+});
+
+pauseBtn.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  if (started && !state.gameOver) togglePause();
+});
+
+// Tapping the playfield itself starts the run and, once it's over, restarts
+// it — the touch equivalents of "press any key" and "press R".
+canvas.addEventListener("pointerdown", () => {
+  if (handleFirstInput()) return;
+  if (state.gameOver) reset();
+});
 
 // ---------------------------------------------------------------- state
 
@@ -1131,7 +1226,15 @@ function drawOverlay(title, tint, subtitle, hint) {
   ctx.fillText(hint, W / 2, H / 2 + 72);
 }
 
+// Mirrors the in-canvas dash meter onto the touch button, since a phone
+// player's thumb is usually resting over the HUD, not looking at it.
+function syncTouchUI() {
+  dashBtn.classList.toggle("cooling", started && state.dashCd > 0);
+}
+
 function draw() {
+  syncTouchUI();
+
   ctx.fillStyle = backdrop;
   ctx.fillRect(0, 0, W, H);
 
@@ -1176,11 +1279,15 @@ function draw() {
   }
 
   if (!started) {
-    drawOverlay("DODGE", "#7af8ff", null, "PRESS ANY KEY TO START");
+    drawOverlay("DODGE", "#7af8ff", null, TOUCH ? "TAP TO START" : "PRESS ANY KEY TO START");
     ctx.textAlign = "center";
     ctx.fillStyle = "#5a6480";
     ctx.font = "9px " + FONT;
-    ctx.fillText("WASD / ARROWS  \u00B7  SHIFT DASH  \u00B7  ESC PAUSE", W / 2, H / 2 + 112);
+    ctx.fillText(
+      TOUCH ? "DRAG TO MOVE  \u00B7  TAP DASH" : "WASD / ARROWS  \u00B7  SHIFT DASH  \u00B7  ESC PAUSE",
+      W / 2,
+      H / 2 + 112
+    );
     return;
   }
 

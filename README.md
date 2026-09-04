@@ -2,7 +2,13 @@
 
 A browser game built with plain HTML, CSS and JavaScript — no build step, no dependencies.
 
-## Running it
+## Play it
+
+https://jculjak.github.io/my_first_game_project/
+
+Works on desktop and phones — the same link adapts to whichever device opens it.
+
+## Running it locally
 
 Open `index.html` in your browser. That's it.
 
@@ -16,15 +22,26 @@ npx serve .
 ## Layout
 
 ```
-index.html      page shell and canvas element
-css/style.css   styling
+index.html      page shell, canvas element, touch controls
+css/style.css   styling, responsive layout
 js/game.js      game loop, input, rendering
+js/audio.js     synthesised music and sound effects
 assets/         images and sounds
 ```
 
 ## Controls
 
-Arrow keys or WASD to move.
+| | Desktop | Phone |
+|---|---|---|
+| Move | Arrow keys / WASD | Drag the joystick |
+| Dash | Shift | Tap DASH |
+| Pause | Esc | Tap II |
+| Restart | R | Tap the screen |
+| Mute | M | — |
+
+## License
+
+All rights reserved — see [LICENSE](LICENSE).
 
 ## Repository
 

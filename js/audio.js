@@ -293,7 +293,9 @@ const GameAudio = (() => {
   // layers added in scheduleStep carry the rest of the intensity.
   function setLevel(next) {
     level = Math.min(Math.max(next, 0), 12);
-    bpm = BASE_BPM + level * 4;
+    // 2 BPM/level tops out at 152 rather than the previous 176 — still a
+    // clear climb, but it no longer runs away by the late levels.
+    bpm = BASE_BPM + level * 2;
   }
 
   // Three rising notes, so a level-up is audible even with the flash missed.
